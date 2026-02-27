@@ -1,17 +1,18 @@
 function BouncingBallSimulator
-% Bouncing Ball Physics Simulator (midpoint checkpoint build)
-% Run this file in MATLAB: >> BouncingBallSimulator
+% Bouncing Ball Physics Simulator
+% midpoint check
 %
-% Midpoint scope implemented:
-% - 1D vertical motion with gravity + linear drag + restitution bounce
-% - Core plots and baseline stats + single-run CSV export
+% this file handles UI/buttons/plots/graphs/frontend
+%
+% So far:
+% - gravity + simple air drag + bounce restitution
+% - basic plots + basic stats + csv save
+% - simulateBouncingBall.m file handles the real-world physics.
 %
 % TODO:
-% - add true real-time animation
-% - upgrade to 2D (x/y, vx/vy) with proper tangential ground friction
-% - Improve collision event timing and stop-when-settled logic
-% - make experiment data reporting better
-
+% - add real animation
+% - full 2D model
+% - cleaner collision handling + better reporting
 
     ui = buildUI();
     ui.runButton.ButtonPushedFcn = @(~,~) runSimulation(ui);
@@ -86,7 +87,7 @@ function ui = buildUI()
         'Tooltip', 'Planned for second half: frame-by-frame animation.');
     setPos(animateButton, 15, [1 2]);
 
-    statsLabel = uilabel(ctl, 'Text', "Stats:" + newline + "(run simulation)", ...
+    statsLabel = uilabel(ctl, 'Text', "Stats:" + newline + "(press run)", ...
         'HorizontalAlignment', 'left');
     setPos(statsLabel, 17, [1 2]);
     statsLabel.FontSize = 12;
@@ -94,10 +95,10 @@ function ui = buildUI()
     scopeArea = uitextarea(ctl, ...
         'Editable', 'off', ...
         'Value', { ...
-        'Checkpoint Scope (Midpoint):', ...
-        '- Implemented: 1D simulator + drag + bounce + plots + stats + CSV save', ...
-        '- Not done yet: true animation, 2D motion, compare mode, advanced collision handling', ...
-        '- Current model is intentionally prototype-level for check-in'});
+        'Midpoint scope:', ...
+        '- Done: 1D sim + drag + bounce + plots + stats + CSV save', ...
+        '- Not done: true animation, 2D motion, compare mode', ...
+        '- This is a prototype for check-in, not final'});
     setPos(scopeArea, [20 24], [1 2]);
     scopeArea.FontSize = 11;
 
@@ -147,17 +148,17 @@ function ui = buildUI()
 end
 
 function runSimulation(ui)
-    params.g = ui.g.Value;
-    params.m = ui.m.Value;
-    params.c = ui.c.Value;
-    params.e = ui.e.Value;
-    params.mu = ui.mu.Value;
-    params.y0 = ui.y0.Value;
-    params.vy0 = ui.vy0.Value;
-    params.tEnd = ui.tEnd.Value;
-    params.dt = ui.dt.Value;
+    p.g = ui.g.Value;
+    p.m = ui.m.Value;
+    p.c = ui.c.Value;
+    p.e = ui.e.Value;
+    p.mu = ui.mu.Value;
+    p.y0 = ui.y0.Value;
+    p.vy0 = ui.vy0.Value;
+    p.tEnd = ui.tEnd.Value;
+    p.dt = ui.dt.Value;
 
-    [t, y, vy, ke, pe, te, stats] = simulateBouncingBall(params);
+    [t, y, vy, ke, pe, te, stats] = simulateBouncingBall(p);
 
     cla(ui.axMotion);
     x = zeros(size(y));
@@ -165,7 +166,7 @@ function runSimulation(ui)
     hold(ui.axMotion, 'on');
     scatter(ui.axMotion, x(end), y(end), 45, 'filled');
     yline(ui.axMotion, 0, '--k', 'Ground');
-    ylim(ui.axMotion, [0, max(1.05 * max(y), params.y0 + 1)]);
+    ylim(ui.axMotion, [0, max(1.05 * max(y), p.y0 + 1)]);
     xlim(ui.axMotion, [-0.3 0.3]);
     hold(ui.axMotion, 'off');
 
@@ -186,7 +187,7 @@ function runSimulation(ui)
 
     ui.statsLabel.Text = sprintf([ ...
         "Stats:\n" + ...
-        "Model Stage: Midpoint 1D prototype\n" + ...
+        "Stage: Midpoint (1D)\n" + ...
         "Bounces: %d\n" + ...
         "Max Height: %.3f m\n" + ...
         "First Bounce Height: %.3f m\n" + ...
@@ -194,59 +195,10 @@ function runSimulation(ui)
         "Energy Lost: %.2f %%\n" + ...
         "Ground friction factor used: %.3f"], ...
         stats.numBounces, stats.maxHeight, stats.firstBounceHeight, ...
-        t(end), stats.energyLossPct, params.mu);
+        t(end), stats.energyLossPct, p.mu);
 
     ui.lastRun = table(t, y, vy, ke, pe, te);
     setappdata(ui.fig, 'lastRun', ui.lastRun);
-end
-
-function [t, y, vy, ke, pe, te, stats] = simulateBouncingBall(p)
-    % NOTE: This is intentionally a midpoint model (1D only).
-    n = floor(p.tEnd / p.dt) + 1;
-    t = (0:n-1)' * p.dt;
-    y = zeros(n, 1);
-    vy = zeros(n, 1);
-
-    y(1) = p.y0;
-    vy(1) = p.vy0;
-
-    numBounces = 0;
-    firstBounceHeight = NaN;
-
-    for i = 2:n
-        a = -p.g - (p.c / p.m) * vy(i-1);
-        vy(i) = vy(i-1) + a * p.dt;
-        y(i) = y(i-1) + vy(i) * p.dt;
-
-        if y(i) <= 0
-            y(i) = 0;
-
-            if vy(i) < 0
-                vy(i) = -p.e * vy(i);
-                numBounces = numBounces + 1;
-
-                if numBounces == 1
-                    firstBounceHeight = (vy(i)^2) / (2 * p.g);
-                end
-
-                % Midpoint model: simple friction-like damping on ground contact.
-                vy(i) = (1 - 0.12 * p.mu) * vy(i);
-            end
-        end
-    end
-
-    ke = 0.5 * p.m * vy.^2;
-    pe = p.m * p.g * y;
-    te = ke + pe;
-
-    stats.numBounces = numBounces;
-    stats.maxHeight = max(y);
-    stats.firstBounceHeight = fillmissing(firstBounceHeight, 'constant', 0);
-    if te(1) > 0
-        stats.energyLossPct = 100 * (te(1) - te(end)) / te(1);
-    else
-        stats.energyLossPct = 0;
-    end
 end
 
 function resetPlots(ui)
@@ -256,7 +208,7 @@ function resetPlots(ui)
     title(ui.axVel, 'Velocity vs Time');
     title(ui.axEnergy, 'Energy vs Time');
     grid(ui.axMotion, 'on'); grid(ui.axHeight, 'on'); grid(ui.axVel, 'on'); grid(ui.axEnergy, 'on');
-    ui.statsLabel.Text = "Stats:" + newline + "(run simulation)";
+    ui.statsLabel.Text = "Stats:" + newline + "(press run)";
     setappdata(ui.fig, 'lastRun', []);
 end
 
@@ -272,7 +224,7 @@ function saveLastRun(ui)
         return;
     end
     writetable(data, fullfile(path, file));
-    uialert(ui.fig, 'Saved single-run raw data CSV (midpoint export feature).', 'Saved');
+    uialert(ui.fig, 'Saved CSV for this run.', 'Saved');
 end
 
 function addLabel(parent, row, textValue)
