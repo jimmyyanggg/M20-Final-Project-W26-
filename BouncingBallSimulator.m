@@ -227,27 +227,9 @@ function resetPlots(ui)
     setappdata(ui.fig, 'lastRun', []);
 end
 
+
+----------------------------------------
 function saveLastRun(ui)
-    data = getappdata(ui.fig, 'lastRun');
-    if isempty(data)
-        uialert(ui.fig, 'No simulation data to save yet. Run simulation first.', 'Nothing to Save');
-        return;
-    end
 
-    [file, path] = uiputfile('simulation_results.csv', 'Save Simulation Data');
-    if isequal(file, 0)
-        return;
-    end
-    writetable(data, fullfile(path, file));
-    uialert(ui.fig, 'Saved CSV for this run.', 'Saved');
-end
-
-function addLabel(parent, row, textValue)
-    lbl = uilabel(parent, 'Text', textValue, 'HorizontalAlignment', 'left');
-    setPos(lbl, row, 1);
-end
-
-function setPos(component, row, col)
-    component.Layout.Row = row;
-    component.Layout.Column = col;
-end
+----------------------------------------
+    
