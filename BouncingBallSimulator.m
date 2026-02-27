@@ -14,12 +14,15 @@ function BouncingBallSimulator
 % - full 2D model
 % - cleaner collision handling + better reporting
 
+
+%connects buttons to code    
     ui = buildUI();
     ui.runButton.ButtonPushedFcn = @(~,~) runSimulation(ui);
     ui.resetButton.ButtonPushedFcn = @(~,~) resetPlots(ui);
     ui.saveButton.ButtonPushedFcn = @(~,~) saveLastRun(ui);
 end
 
+%set up main window, control grid (inputs), 
 function ui = buildUI()
     fig = uifigure('Name', 'Bouncing Ball Physics Simulator', 'Position', [80 80 1200 700]);
     gl = uigridlayout(fig, [1 2]);
@@ -31,7 +34,8 @@ function ui = buildUI()
     ctl = uigridlayout(left, [24 2]);
     ctl.RowHeight = repmat({24}, 1, 24);
     ctl.ColumnWidth = {150, '1x'};
-
+    
+%label for everything
     addLabel(ctl, 1, 'Gravity g (m/s^2):');
     gField = uieditfield(ctl, 'numeric', 'Value', 9.81, 'Limits', [0 Inf], 'RoundFractionalValues', false);
     setPos(gField, 1, 2);
@@ -68,24 +72,32 @@ function ui = buildUI()
     dtField = uieditfield(ctl, 'numeric', 'Value', 0.005, 'Limits', [1e-4 0.1], 'RoundFractionalValues', false);
     setPos(dtField, 9, 2);
 
+    
+%run, reset, save buttons (completed)
     runButton = uibutton(ctl, 'push', 'Text', 'Run Simulation');
     setPos(runButton, 11, [1 2]);
+    
     resetButton = uibutton(ctl, 'push', 'Text', 'Reset Plots');
     setPos(resetButton, 12, [1 2]);
+    
     saveButton = uibutton(ctl, 'push', 'Text', 'Save Last Run');
     setPos(saveButton, 13, [1 2]);
+--------------------------------------
 
-    compareButton = uibutton(ctl, 'push', ...
+%in progress compare/animation 
+    %%%%compareButton = uibutton(ctl, 'push', ...
         'Text', 'Compare Runs (TODO)', ...
         'Enable', 'off', ...
         'Tooltip', 'Planned for second half: compare multiple parameter sets.');
     setPos(compareButton, 14, [1 2]);
 
-    animateButton = uibutton(ctl, 'push', ...
+   %%%%%% animateButton = uibutton(ctl, 'push', ...
         'Text', 'Real-Time Animation (TODO)', ...
         'Enable', 'off', ...
         'Tooltip', 'Planned for second half: frame-by-frame animation.');
     setPos(animateButton, 15, [1 2]);
+
+--------------------------------------
 
     statsLabel = uilabel(ctl, 'Text', "Stats:" + newline + "(press run)", ...
         'HorizontalAlignment', 'left');
@@ -122,6 +134,9 @@ function ui = buildUI()
     axEnergy = uiaxes(rg); setPos(axEnergy, 2, 2);
     title(axEnergy, 'Energy vs Time'); xlabel(axEnergy, 'Time (s)'); ylabel(axEnergy, 'Energy (J)'); grid(axEnergy, 'on');
 
+
+    
+%all the app components
     ui = struct();
     ui.fig = fig;
     ui.g = gField;
