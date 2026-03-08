@@ -334,14 +334,14 @@ end
 
 %updates status text and displays in UI
 function setStatus(ui, txt)
-
-    %make sure window and status box are still open and there
+    %make sure window and status box are still open and there. supports
+    %both one line and multiline status texts
     if isgraphics(ui.fig, 'figure') && isgraphics(ui.statusLabel)
         if iscell(txt)
-            ui.statusLabel.Value = txt;
+            ui.statusLabel.Value = txt;    
+        else
+            ui.statusLabel.Value = {txt};   
         end
-
-        %refreshes UI the moment program ends
         drawnow;
     end
 end
