@@ -1,235 +1,357 @@
 function BouncingBallSimulator
-% Bouncing Ball Physics Simulator
-% midpoint check
-%
-% this file handles UI/buttons/plots/graphs/frontend
-%
-% So far:
-% - gravity + simple air drag + bounce restitution
-% - basic plots + basic stats + csv save
-% - simulateBouncingBall.m file handles the real-world physics.
-%
-% TODO:
-% - add real animation
-% - full 2D model
-% - cleaner collision handling + better reporting
-
-
-%connects buttons to code    
+    %initial GUI
     ui = buildUI();
-    ui.runButton.ButtonPushedFcn = @(~,~) runSimulation(ui);
+    setappdata(ui.fig,'lastRun',[]);
+    setappdata(ui.fig,'stopSim', false);
+
+    % make sure clicking the X stops animation/loop first
+    ui.fig.CloseRequestFcn = @(src,~) closeApp(src);
+
+    %map buttons to coded functions
+    ui.runButton.ButtonPushedFcn   = @(~,~) runSimulation(ui);
     ui.resetButton.ButtonPushedFcn = @(~,~) resetPlots(ui);
-    ui.saveButton.ButtonPushedFcn = @(~,~) saveLastRun(ui);
+    ui.saveButton.ButtonPushedFcn  = @(~,~) saveLastRun(ui);
 end
 
-%set up main window, control grid (inputs), 
+
+%main app layout (window, user inputs and buttons, control grid)
 function ui = buildUI()
-    fig = uifigure('Name', 'Bouncing Ball Physics Simulator', 'Position', [80 80 1200 700]);
-    gl = uigridlayout(fig, [1 2]);
-    gl.ColumnWidth = {300, '1x'};
+    fig = uifigure('Name','Bouncing Ball Physics Simulator', ...
+                   'Position',[80 80 1100 700]);
 
-    left = uipanel(gl, 'Title', 'Controls');
-    left.Layout.Row = 1;
-    left.Layout.Column = 1;
-    ctl = uigridlayout(left, [24 2]);
-    ctl.RowHeight = repmat({24}, 1, 24);
-    ctl.ColumnWidth = {150, '1x'};
+    mainGrid = uigridlayout(fig,[1 2]);
+    mainGrid.ColumnWidth = {300,'1x'};
+
+    leftPanel = uipanel(mainGrid,'Title','Controls');
+    leftPanel.Layout.Row = 1;
+    leftPanel.Layout.Column = 1;
+
+    ctrl = uigridlayout(leftPanel,[26 2]);
+    ctrl.RowHeight = repmat({24},1,26);
+    ctrl.ColumnWidth = {140,'1x'};
+
+
+    %changeable Physics inputs 
+    addLabel(ctrl,1,'Gravity (m/s^2):');
+    gravInput = uieditfield(ctrl,'numeric', ...
+        'Value',9.81,'Limits',[0 Inf],'RoundFractionalValues',false);
+    setPos(gravInput,1,2);
+
+    addLabel(ctrl,2,'Mass (kg):');
+    massInput = uieditfield(ctrl,'numeric', ...
+        'Value',1.0,'Limits',[0.001 Inf],'RoundFractionalValues',false);
+    setPos(massInput,2,2);
+
+    addLabel(ctrl,3,'Air drag(kg/s):');
+    dragInput = uieditfield(ctrl,'numeric', ...
+        'Value',0.05,'Limits',[0 Inf],'RoundFractionalValues',false);
+    setPos(dragInput,3,2);
+
+    addLabel(ctrl,4,'Restitution e (0-1):');
+    restitutionInput = uieditfield(ctrl,'numeric', ...
+        'Value',0.82,'Limits',[0 1],'RoundFractionalValues',false);
+    setPos(restitutionInput,4,2);
+
+    addLabel(ctrl,5,'Ground friction:');
+    fricInput = uieditfield(ctrl,'numeric', ...
+        'Value',0.05,'Limits',[0 1],'RoundFractionalValues',false);
+    setPos(fricInput,5,2);
+
+    %inital positions and velocities
+    addLabel(ctrl,6,'Initial x0 (m):');
+    x0Input = uieditfield(ctrl,'numeric', ...
+        'Value',0.0,'RoundFractionalValues',false);
+    setPos(x0Input,6,2);
+
+    addLabel(ctrl,7,'Initial y0 (m):');
+    y0Input = uieditfield(ctrl,'numeric', ...
+        'Value',5.0,'Limits',[0 Inf],'RoundFractionalValues',false);
+    setPos(y0Input,7,2);
+
+    addLabel(ctrl,8,'Initial vx0 (m/s):');
+    vx0Input = uieditfield(ctrl,'numeric', ...
+        'Value',1.0,'RoundFractionalValues',false);
+    setPos(vx0Input,8,2);
+
+    addLabel(ctrl,9,'Initial vy0 (m/s):');
+    vy0Input = uieditfield(ctrl,'numeric', ...
+        'Value',0.0,'RoundFractionalValues',false);
+    setPos(vy0Input,9,2);
+
+    %set simulation length
+    addLabel(ctrl,10,'Simulation time (s):');
+    timeEndInput = uieditfield(ctrl,'numeric', ...
+        'Value',8.0,'Limits',[0.2 200],'RoundFractionalValues',false);
+    setPos(timeEndInput,10,2);
+
+    %simulation step size
+    addLabel(ctrl,11,'dt (s):');
+    timeChangeInput = uieditfield(ctrl,'numeric', ...
+        'Value',0.005,'Limits',[1e-4 0.1],'RoundFractionalValues',false);
+    setPos(timeChangeInput,11,2);
+
+
+    animateCheck = uicheckbox(ctrl,'Text','Animate while running','Value',true);
+    setPos(animateCheck,12,[1 2]);
+
+
+    %Create buttons and application status
+    runButton = uibutton(ctrl,'push','Text','Run Simulation');
+    setPos(runButton,14,[1 2]);
+
+    resetButton = uibutton(ctrl,'push','Text','Reset Plots');
+    setPos(resetButton,15,[1 2]);
+
+    saveButton = uibutton(ctrl,'push','Text','Save Last Run (CSV)');
+    setPos(saveButton,16,[1 2]);
+
+    statusLabel = uilabel(ctrl,'Text','Status: ready','HorizontalAlignment','left');
+    statusLabel.FontSize = 12;
+    setPos(statusLabel,18,[1 2]);
+   
+
+
+    %create 2x2 grid for trajectory, height, velocity, and energy
+    rightPanel = uipanel(mainGrid,'Title','Plots');
+    rightPanel.Layout.Row = 1;
+    rightPanel.Layout.Column = 2;
+
+    pGrid = uigridlayout(rightPanel,[2 2]);
+    pGrid.RowHeight = {'1x','1x'};
+    pGrid.ColumnWidth = {'1x','1x'};
+
+
+    %axis for trajectory plot
+    axMotion = uiaxes(pGrid);
+    setPos(axMotion,1,1);
+    title(axMotion,'Trajectory');
+    xlabel(axMotion,'x (m)');
+    ylabel(axMotion,'y (m)');
+    grid(axMotion,'on');
+
+    %axis for height plot
+    axHeight = uiaxes(pGrid);
+    setPos(axHeight,1,2);
+    title(axHeight,'Height vs Time');
+    xlabel(axHeight,'Time (s)');
+    ylabel(axHeight,'Height (m)');
+    grid(axHeight,'on');
+
+    %axis for velocity height
+    axVel = uiaxes(pGrid);
+    setPos(axVel,2,1);
+    title(axVel,'Velocities vs Time');
+    xlabel(axVel,'Time (s)');
+    ylabel(axVel,'Velocity (m/s)');
+    grid(axVel,'on');
+
+
+    %axis for energy plot
+    axEnergy = uiaxes(pGrid);
+    setPos(axEnergy,2,2);
+    title(axEnergy,'Energy vs Time');
+    xlabel(axEnergy,'Time (s)');
+    ylabel(axEnergy,'Energy (J)');
+    grid(axEnergy,'on');
+
     
-%label for everything
-    addLabel(ctl, 1, 'Gravity g (m/s^2):');
-    gField = uieditfield(ctl, 'numeric', 'Value', 9.81, 'Limits', [0 Inf], 'RoundFractionalValues', false);
-    setPos(gField, 1, 2);
-
-    addLabel(ctl, 2, 'Mass m (kg):');
-    mField = uieditfield(ctl, 'numeric', 'Value', 1.0, 'Limits', [0.001 Inf], 'RoundFractionalValues', false);
-    setPos(mField, 2, 2);
-
-    addLabel(ctl, 3, 'Air drag c (kg/s):');
-    cField = uieditfield(ctl, 'numeric', 'Value', 0.08, 'Limits', [0 Inf], 'RoundFractionalValues', false);
-    setPos(cField, 3, 2);
-
-    addLabel(ctl, 4, 'Restitution e (0-1):');
-    eField = uieditfield(ctl, 'numeric', 'Value', 0.82, 'Limits', [0 1], 'RoundFractionalValues', false);
-    setPos(eField, 4, 2);
-
-    addLabel(ctl, 5, 'Ground friction mu:');
-    muField = uieditfield(ctl, 'numeric', 'Value', 0.05, 'Limits', [0 1], 'RoundFractionalValues', false);
-    setPos(muField, 5, 2);
-
-    addLabel(ctl, 6, 'Initial height y0 (m):');
-    y0Field = uieditfield(ctl, 'numeric', 'Value', 5.0, 'Limits', [0 Inf], 'RoundFractionalValues', false);
-    setPos(y0Field, 6, 2);
-
-    addLabel(ctl, 7, 'Initial vy0 (m/s):');
-    vy0Field = uieditfield(ctl, 'numeric', 'Value', 0.0, 'RoundFractionalValues', false);
-    setPos(vy0Field, 7, 2);
-
-    addLabel(ctl, 8, 'Total time (s):');
-    tEndField = uieditfield(ctl, 'numeric', 'Value', 8.0, 'Limits', [0.2 200], 'RoundFractionalValues', false);
-    setPos(tEndField, 8, 2);
-
-    addLabel(ctl, 9, 'dt (s):');
-    dtField = uieditfield(ctl, 'numeric', 'Value', 0.005, 'Limits', [1e-4 0.1], 'RoundFractionalValues', false);
-    setPos(dtField, 9, 2);
-
-    
-%run, reset, save buttons (completed)
-    runButton = uibutton(ctl, 'push', 'Text', 'Run Simulation');
-    setPos(runButton, 11, [1 2]);
-    
-    resetButton = uibutton(ctl, 'push', 'Text', 'Reset Plots');
-    setPos(resetButton, 12, [1 2]);
-    
-    saveButton = uibutton(ctl, 'push', 'Text', 'Save Last Run');
-    setPos(saveButton, 13, [1 2]);
---------------------------------------
-
-%in progress compare/animation 
-    %%%%compareButton = uibutton(ctl, 'push', ...
-        'Text', 'Compare Runs (TODO)', ...
-        'Enable', 'off', ...
-        'Tooltip', 'Planned for second half: compare multiple parameter sets.');
-    setPos(compareButton, 14, [1 2]);
-
-   %%%%%% animateButton = uibutton(ctl, 'push', ...
-        'Text', 'Real-Time Animation (TODO)', ...
-        'Enable', 'off', ...
-        'Tooltip', 'Planned for second half: frame-by-frame animation.');
-    setPos(animateButton, 15, [1 2]);
-
---------------------------------------
-
-    statsLabel = uilabel(ctl, 'Text', "Stats:" + newline + "(press run)", ...
-        'HorizontalAlignment', 'left');
-    setPos(statsLabel, 17, [1 2]);
-    statsLabel.FontSize = 12;
-
-    scopeArea = uitextarea(ctl, ...
-        'Editable', 'off', ...
-        'Value', { ...
-        'Midpoint scope:', ...
-        '- Done: 1D sim + drag + bounce + plots + stats + CSV save', ...
-        '- Not done: true animation, 2D motion, compare mode', ...
-        '- This is a prototype for check-in, not final'});
-    setPos(scopeArea, [20 24], [1 2]);
-    scopeArea.FontSize = 11;
-
-    right = uipanel(gl, 'Title', 'Simulation & Plots');
-    right.Layout.Row = 1;
-    right.Layout.Column = 2;
-    rg = uigridlayout(right, [2 2]);
-    rg.RowHeight = {'1x', '1x'};
-    rg.ColumnWidth = {'1x', '1x'};
-
-    axMotion = uiaxes(rg); setPos(axMotion, 1, 1);
-    title(axMotion, 'Ball Motion'); xlabel(axMotion, 'x (m)'); ylabel(axMotion, 'y (m)');
-    xlim(axMotion, [-1 1]); ylim(axMotion, [0 10]); grid(axMotion, 'on');
-
-    axHeight = uiaxes(rg); setPos(axHeight, 1, 2);
-    title(axHeight, 'Height vs Time'); xlabel(axHeight, 'Time (s)'); ylabel(axHeight, 'Height (m)'); grid(axHeight, 'on');
-
-    axVel = uiaxes(rg); setPos(axVel, 2, 1);
-    title(axVel, 'Velocity vs Time'); xlabel(axVel, 'Time (s)'); ylabel(axVel, 'Velocity (m/s)'); grid(axVel, 'on');
-
-    axEnergy = uiaxes(rg); setPos(axEnergy, 2, 2);
-    title(axEnergy, 'Energy vs Time'); xlabel(axEnergy, 'Time (s)'); ylabel(axEnergy, 'Energy (J)'); grid(axEnergy, 'on');
-
-
-    
-%all the app components
-    ui = struct();
+    %UI STRUCT: easy to access
     ui.fig = fig;
-    ui.g = gField;
-    ui.m = mField;
-    ui.c = cField;
-    ui.e = eField;
-    ui.mu = muField;
-    ui.y0 = y0Field;
-    ui.vy0 = vy0Field;
-    ui.tEnd = tEndField;
-    ui.dt = dtField;
+    ui.g = gravInput;
+    ui.m = massInput;
+    ui.c = dragInput;
+    ui.e = restitutionInput;
+    ui.mu = fricInput;
+    ui.x0 = x0Input;
+    ui.y0 = y0Input;
+    ui.vx0 = vx0Input;
+    ui.vy0 = vy0Input;
+    ui.tEnd = timeEndInput;
+    ui.dt = timeChangeInput;
+    ui.animateCheck = animateCheck;
     ui.runButton = runButton;
     ui.resetButton = resetButton;
     ui.saveButton = saveButton;
-    ui.compareButton = compareButton;
-    ui.animateButton = animateButton;
-    ui.statsLabel = statsLabel;
-    ui.scopeArea = scopeArea;
+    ui.statusLabel = statusLabel;
     ui.axMotion = axMotion;
     ui.axHeight = axHeight;
     ui.axVel = axVel;
     ui.axEnergy = axEnergy;
-    ui.lastRun = [];
 end
 
+
+%main function for the RUN button
 function runSimulation(ui)
+    % stop any old run and clear previous output
+    if isappdata(ui.fig,'stopSim')
+        setappdata(ui.fig,'stopSim',false);
+    end
+
+    % if app closed or any plot is messed up, do nothing and exit function
+    if ~isgraphics(ui.fig, "figure") || ~isgraphics(ui.axMotion, "axes") || ~isgraphics(ui.axHeight, "axes") ||~isgraphics(ui.axVel, "axes") ||~isgraphics(ui.axEnergy, "axes")
+        return;
+    end
+
+    p = readParams(ui);
+    setStatus(ui,'Running simulation...');
+    cla(ui.axMotion); cla(ui.axHeight); cla(ui.axVel); cla(ui.axEnergy);
+
+
+    % Run the simulated physics model from other file. gets time and
+    % simulation stats
+    [t,x,y,vx,vy,speed,ke,pe,te,stats] = simulateBouncingBall(p, ui.animateCheck.Value, ui.axMotion);
+
+    if isempty(t)
+        setStatus(ui,'No data produced.');
+        return;
+    end
+
+    % Height plot
+    plot(ui.axHeight, t, y);
+    legend(ui.axHeight,{'Height'},'Location','best');
+
+
+    %Velocity plot
+    plot(ui.axVel, t, vx);
+    hold(ui.axVel,'on');
+    plot(ui.axVel, t, vy);
+    plot(ui.axVel, t, speed, ':');
+    hold(ui.axVel,'off');
+    legend(ui.axVel,{'Vx','Vy','Speed'},'Location','best');
+
+
+    %Energies: kinetic, potential, total mechanical
+    plot(ui.axEnergy, t, ke);
+    hold(ui.axEnergy,'on');
+    plot(ui.axEnergy, t, pe);
+    plot(ui.axEnergy, t, te);
+    hold(ui.axEnergy,'off');
+    legend(ui.axEnergy,{'KE','PE','Total'},'Location','best');
+
+     
+    %overal trajectory and final position
+    plot(ui.axMotion, x, y);
+    hold(ui.axMotion,'on');
+    scatter(ui.axMotion, x(end), y(end), 25, 'filled');
+    plot(ui.axMotion, [min(x)-1 max(x)+1], [0 0], 'k--');
+    hold(ui.axMotion,'off');
+
+
+    %
+    firstTxt = 'N/A';
+    if ~isnan(stats.firstBounceHeight)
+        firstTxt = sprintf('%.4f', stats.firstBounceHeight);
+    end
+    %
+    setStatus(ui, sprintf([ ...
+        'Status: finished\n' ...
+        'Bounces: %d\n' ...
+        'Max height: %.4f m\n' ...
+        'Max range: %.4f m\n' ...
+        'First bounce height: %s m\n' ...
+        'Energy lost: %.2f %%\n' ...
+        'Peak speed: %.4f m/s'], ...
+        stats.numBounces, stats.maxHeight, stats.maxRange, firstTxt, ...
+        stats.energyLossPct, stats.peakSpeed));
+
+    %saves run. when "save run" button gets clicked, data gets exported as
+    %csv
+    lastRun = table(t,x,y,vx,vy,speed,ke,pe,te, ...
+        'VariableNames',{'Time_s','x_m','y_m','vx_mps','vy_mps','speed_mps','KE_J','PE_J','TotalE_J'});
+    setappdata(ui.fig,'lastRun',lastRun);
+end
+
+
+
+%PARAMETERS STRUCT - collects all inputted values from UI and turns into
+%computable numbers
+function p = readParams(ui)
     p.g = ui.g.Value;
     p.m = ui.m.Value;
     p.c = ui.c.Value;
     p.e = ui.e.Value;
     p.mu = ui.mu.Value;
+    p.x0 = ui.x0.Value;
     p.y0 = ui.y0.Value;
+    p.vx0 = ui.vx0.Value;
     p.vy0 = ui.vy0.Value;
     p.tEnd = ui.tEnd.Value;
     p.dt = ui.dt.Value;
+    p.fps = 60;
+    p.fig = ui.fig;
+end
 
-    [t, y, vy, ke, pe, te, stats] = simulateBouncingBall(p);
+
+%clears the four plots so previous simulation traces are removed
+function resetPlots(ui)
+    % signal running simulation (if any) to stop
+    setappdata(ui.fig,'stopSim', true);
 
     cla(ui.axMotion);
-    x = zeros(size(y));
-    plot(ui.axMotion, x, y, 'LineWidth', 1.8);
-    hold(ui.axMotion, 'on');
-    scatter(ui.axMotion, x(end), y(end), 45, 'filled');
-    yline(ui.axMotion, 0, '--k', 'Ground');
-    ylim(ui.axMotion, [0, max(1.05 * max(y), p.y0 + 1)]);
-    xlim(ui.axMotion, [-0.3 0.3]);
-    hold(ui.axMotion, 'off');
-
     cla(ui.axHeight);
-    plot(ui.axHeight, t, y, 'LineWidth', 1.8);
-
-    cla(ui.axVel);
-    plot(ui.axVel, t, vy, 'LineWidth', 1.8);
-    yline(ui.axVel, 0, '--k');
-
+    cla(ui.axVel); 
     cla(ui.axEnergy);
-    plot(ui.axEnergy, t, ke, 'LineWidth', 1.5, 'DisplayName', 'KE');
-    hold(ui.axEnergy, 'on');
-    plot(ui.axEnergy, t, pe, 'LineWidth', 1.5, 'DisplayName', 'PE');
-    plot(ui.axEnergy, t, te, 'LineWidth', 1.8, 'DisplayName', 'Total');
-    hold(ui.axEnergy, 'off');
-    legend(ui.axEnergy, 'Location', 'best');
 
-    ui.statsLabel.Text = sprintf([ ...
-        "Stats:\n" + ...
-        "Stage: Midpoint (1D)\n" + ...
-        "Bounces: %d\n" + ...
-        "Max Height: %.3f m\n" + ...
-        "First Bounce Height: %.3f m\n" + ...
-        "Simulated Time: %.2f s\n" + ...
-        "Energy Lost: %.2f %%\n" + ...
-        "Ground friction factor used: %.3f"], ...
-        stats.numBounces, stats.maxHeight, stats.firstBounceHeight, ...
-        t(end), stats.energyLossPct, p.mu);
+    %re-adds the axis labels after clearing everything
+    title(ui.axMotion,'Trajectory'); xlabel(ui.axMotion,'x (m)'); ylabel(ui.axMotion,'y (m)'); grid(ui.axMotion,'on');
+    title(ui.axHeight,'Height vs Time'); xlabel(ui.axHeight,'Time (s)'); ylabel(ui.axHeight,'Height (m)'); grid(ui.axHeight,'on');
+    title(ui.axVel,'Velocities vs Time'); xlabel(ui.axVel,'Time (s)'); ylabel(ui.axVel,'Velocity (m/s)'); grid(ui.axVel,'on');
+    title(ui.axEnergy,'Energy vs Time'); xlabel(ui.axEnergy,'Time (s)'); ylabel(ui.axEnergy,'Energy (J)'); grid(ui.axEnergy,'on');
 
-    ui.lastRun = table(t, y, vy, ke, pe, te);
-    setappdata(ui.fig, 'lastRun', ui.lastRun);
-end
-
-function resetPlots(ui)
-    cla(ui.axMotion); cla(ui.axHeight); cla(ui.axVel); cla(ui.axEnergy);
-    title(ui.axMotion, 'Ball Motion');
-    title(ui.axHeight, 'Height vs Time');
-    title(ui.axVel, 'Velocity vs Time');
-    title(ui.axEnergy, 'Energy vs Time');
-    grid(ui.axMotion, 'on'); grid(ui.axHeight, 'on'); grid(ui.axVel, 'on'); grid(ui.axEnergy, 'on');
-    ui.statsLabel.Text = "Stats:" + newline + "(press run)";
-    setappdata(ui.fig, 'lastRun', []);
+    % updates status and stores the data
+    setStatus(ui,'Status: reset complete');
+    setappdata(ui.fig,'lastRun',[]);
 end
 
 
-----------------------------------------
+%saves last ran data to CSV and then changes status text
 function saveLastRun(ui)
+    data = getappdata(ui.fig,'lastRun');
+    if isempty(data)
+        uialert(ui.fig,'No run to save. Run Simulation first.','No Data');
+        return;
+    end
+    %asks user where they want to save the file
+    [file,path] = uiputfile('bouncingball_last_run.csv','Save last run');
+    if isequal(file,0) 
+        return; 
+    end
+    %writes table to csv
+    writetable(data, fullfile(path,file));
+    uialert(ui.fig,['Saved: ' fullfile(path,file)], 'Saved');
+end
 
-----------------------------------------
-    
+
+%updates status text and displays in UI
+function setStatus(ui, txt)
+    % only update if status label still exists
+    if isgraphics(ui.statusLabel, 'text')
+        ui.statusLabel.Text = txt;
+        drawnow;
+    end
+end
+
+
+%addlabel function
+function addLabel(parent,row,textValue)
+    label = uilabel(parent,'Text',textValue);
+
+    %places labels in top left part of overall UI
+    setPos(label,row,1);
+end
+
+
+%places UI objects in specific rows and columns of uigridlayout
+function setPos(component,row,col)
+    component.Layout.Row = row;
+    component.Layout.Column = col;
+end
+
+
+% closing window stops simulation first so no invalid handle errors
+function closeApp(figHandle)
+    if isgraphics(figHandle,'figure')
+        setappdata(figHandle,'stopSim', true);
+    end
+    delete(figHandle);
+end
