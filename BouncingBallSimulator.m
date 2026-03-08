@@ -16,8 +16,7 @@ end
 
 %main app layout (window, user inputs and buttons, control grid)
 function ui = buildUI()
-    fig = uifigure('Name','Bouncing Ball Physics Simulator', ...
-                   'Position',[80 80 1100 700]);
+    fig = uifigure('Name','Bouncing Ball Physics Simulator', 'Position',[80 80 1100 700]);
 
     mainGrid = uigridlayout(fig,[1 2]);
     mainGrid.ColumnWidth = {300,'1x'};
@@ -105,9 +104,11 @@ function ui = buildUI()
     saveButton = uibutton(ctrl,'push','Text','Save Last Run (CSV)');
     setPos(saveButton,16,[1 2]);
 
-    statusLabel = uilabel(ctrl,'Text','Status: ready','HorizontalAlignment','left');
-    statusLabel.FontSize = 12;
-    setPos(statusLabel,18,[1 2]);
+
+    %used a ui text area to show a multi-line display box
+    statusLabel = uitextarea(ctrl,'Value', {'Status: ready'}, 'Editable', 'off', 'WordWrap', 'on');
+    setPos(statusLabel, [18 40], [1 2]);
+
    
 
 
@@ -237,22 +238,31 @@ function runSimulation(ui)
     hold(ui.axMotion,'off');
 
 
-    %
-    firstTxt = 'N/A';
-    if ~isnan(stats.firstBounceHeight)
-        firstTxt = sprintf('%.4f', stats.firstBounceHeight);
+    % shows nothing first so that it's not blank. replace when first bounce
+    % occurs
+    if isempty(stats.firstBounceHeight)
+        firstTxt = 'N/A';
+    else
+        % converts the number to a string
+        firstTxt = num2str(stats.firstBounceHeight, '%.3f');
     end
-    %
-    setStatus(ui, sprintf([ ...
-        'Status: finished\n' ...
-        'Bounces: %d\n' ...
-        'Max height: %.4f m\n' ...
-        'Max range: %.4f m\n' ...
-        'First bounce height: %s m\n' ...
-        'Energy lost: %.2f %%\n' ...
-        'Peak speed: %.4f m/s'], ...
-        stats.numBounces, stats.maxHeight, stats.maxRange, firstTxt, ...
-        stats.energyLossPct, stats.peakSpeed));
+
+    statusText = { ...
+        'Status: finished', ...
+         ['Bounces: ' num2str(stats.numBounces)], ...
+         ['Max height: ' num2str(stats.maxHeight, '%.2f') ' m'], ...
+         ['Max range: ' num2str(stats.maxRange, '%.2f') ' m'], ...
+         ['First bounce height: ' firstTxt ' m'], ...
+         ['Energy lost: ' num2str(stats.energyLossPct, '%.2f') ' %'], ...
+         ['Peak speed: ' num2str(stats.peakSpeed, '%.2f') ' m/s']};
+
+    
+    %only update UI text if window is still open
+    if isgraphics(ui.fig, 'figure')
+        setStatus(ui, statusText);
+    end
+
+
 
     %saves run. when "save run" button gets clicked, data gets exported as
     %csv
@@ -324,12 +334,18 @@ end
 
 %updates status text and displays in UI
 function setStatus(ui, txt)
-    % only update if status label still exists
-    if isgraphics(ui.statusLabel, 'text')
-        ui.statusLabel.Text = txt;
+
+    %make sure window and status box are still open and there
+    if isgraphics(ui.fig, 'figure') && isgraphics(ui.statusLabel)
+        if iscell(txt)
+            ui.statusLabel.Value = txt;
+        end
+
+        %refreshes UI the moment program ends
         drawnow;
     end
 end
+
 
 
 %addlabel function
