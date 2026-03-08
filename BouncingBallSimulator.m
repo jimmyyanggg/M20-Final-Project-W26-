@@ -25,71 +25,62 @@ function ui = buildUI()
     leftPanel.Layout.Row = 1;
     leftPanel.Layout.Column = 1;
 
-    ctrl = uigridlayout(leftPanel,[26 2]);
+    ctrl = uigridlayout(leftPanel,[15 2]);
     ctrl.RowHeight = repmat({24},1,26);
     ctrl.ColumnWidth = {140,'1x'};
 
 
     %changeable Physics inputs 
     addLabel(ctrl,1,'Gravity (m/s^2):');
-    gravInput = uieditfield(ctrl,'numeric', ...
-        'Value',9.81,'Limits',[0 Inf],'RoundFractionalValues',false);
+    gravInput = uieditfield(ctrl,'numeric', 'Value',9.81,'Limits',[0 Inf],'RoundFractionalValues',false);
     setPos(gravInput,1,2);
 
     addLabel(ctrl,2,'Mass (kg):');
-    massInput = uieditfield(ctrl,'numeric', ...
-        'Value',1.0,'Limits',[0.001 Inf],'RoundFractionalValues',false);
+    massInput = uieditfield(ctrl,'numeric', 'Value',1.0,'Limits',[0.001 Inf],'RoundFractionalValues',false);
     setPos(massInput,2,2);
 
     addLabel(ctrl,3,'Air drag(kg/s):');
-    dragInput = uieditfield(ctrl,'numeric', ...
-        'Value',0.05,'Limits',[0 Inf],'RoundFractionalValues',false);
+    dragInput = uieditfield(ctrl,'numeric','Value',0.05,'Limits',[0 Inf],'RoundFractionalValues',false);
     setPos(dragInput,3,2);
 
     addLabel(ctrl,4,'Restitution e (0-1):');
-    restitutionInput = uieditfield(ctrl,'numeric', ...
-        'Value',0.82,'Limits',[0 1],'RoundFractionalValues',false);
+    restitutionInput = uieditfield(ctrl,'numeric', 'Value',0.82,'Limits',[0 1],'RoundFractionalValues',false);
     setPos(restitutionInput,4,2);
 
     addLabel(ctrl,5,'Ground friction:');
-    fricInput = uieditfield(ctrl,'numeric', ...
-        'Value',0.05,'Limits',[0 1],'RoundFractionalValues',false);
+    fricInput = uieditfield(ctrl,'numeric', 'Value',0.05,'Limits',[0 1],'RoundFractionalValues',false);
     setPos(fricInput,5,2);
 
     %inital positions and velocities
     addLabel(ctrl,6,'Initial x0 (m):');
-    x0Input = uieditfield(ctrl,'numeric', ...
-        'Value',0.0,'RoundFractionalValues',false);
+    x0Input = uieditfield(ctrl,'numeric','Value',0.0,'RoundFractionalValues',false);
     setPos(x0Input,6,2);
 
     addLabel(ctrl,7,'Initial y0 (m):');
-    y0Input = uieditfield(ctrl,'numeric', ...
-        'Value',5.0,'Limits',[0 Inf],'RoundFractionalValues',false);
+    y0Input = uieditfield(ctrl,'numeric','Value',5.0,'Limits',[0 Inf],'RoundFractionalValues',false);
     setPos(y0Input,7,2);
 
     addLabel(ctrl,8,'Initial vx0 (m/s):');
-    vx0Input = uieditfield(ctrl,'numeric', ...
-        'Value',1.0,'RoundFractionalValues',false);
+    vx0Input = uieditfield(ctrl,'numeric', 'Value',1.0,'RoundFractionalValues',false);
     setPos(vx0Input,8,2);
 
     addLabel(ctrl,9,'Initial vy0 (m/s):');
-    vy0Input = uieditfield(ctrl,'numeric', ...
-        'Value',0.0,'RoundFractionalValues',false);
+    vy0Input = uieditfield(ctrl,'numeric', 'Value',0.0,'RoundFractionalValues',false);
     setPos(vy0Input,9,2);
 
     %set simulation length
     addLabel(ctrl,10,'Simulation time (s):');
-    timeEndInput = uieditfield(ctrl,'numeric', ...
-        'Value',8.0,'Limits',[0.2 200],'RoundFractionalValues',false);
+    timeEndInput = uieditfield(ctrl,'numeric', 'Value',8.0,'Limits',[0.2 200],'RoundFractionalValues',false);
     setPos(timeEndInput,10,2);
 
     %simulation step size
     addLabel(ctrl,11,'dt (s):');
-    timeChangeInput = uieditfield(ctrl,'numeric', ...
-        'Value',0.005,'Limits',[1e-4 0.1],'RoundFractionalValues',false);
+    timeChangeInput = uieditfield(ctrl,'numeric','Value',0.005,'Limits',[1e-4 0.1],'RoundFractionalValues',false);
     setPos(timeChangeInput,11,2);
 
 
+
+    %allows user if they want to see animation or not
     animateCheck = uicheckbox(ctrl,'Text','Animate while running','Value',true);
     setPos(animateCheck,12,[1 2]);
 
