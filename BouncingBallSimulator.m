@@ -85,7 +85,7 @@ function ui = buildUI()
     setPos(animateCheck,12,[1 2]);
 
 
-    %Create buttons and application status
+    %Create buttons
     runButton = uibutton(ctrl,'push','Text','Run Simulation');
     setPos(runButton,14,[1 2]);
 
@@ -258,7 +258,7 @@ function runSimulation(ui)
     %saves run. when "save run" button gets clicked, data gets exported as
     %csv
     lastRun = table(t,x,y,vx,vy,speed,ke,pe,te, ...
-        'VariableNames',{'Time_s','x_m','y_m','vx_mps','vy_mps','speed_mps','KE_J','PE_J','TotalE_J'});
+        'VariableNames',{'Time','x','y','vx','vy','speed','KE','PE','Total E'});
     setappdata(ui.fig,'lastRun',lastRun);
 end
 
