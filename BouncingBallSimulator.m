@@ -98,7 +98,7 @@ function ui = buildUI()
 
     %used a ui text area to show a multi-line display box
     statusLabel = uitextarea(ctrl,'Value', {'Status: ready'}, 'Editable', 'off', 'WordWrap', 'on');
-    setPos(statusLabel, [18 40], [1 2]);
+    setPos(statusLabel, [18 26], [1 2]);
 
    
 
