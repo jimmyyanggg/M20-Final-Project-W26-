@@ -26,7 +26,7 @@ function ui = buildUI()
     leftPanel.Layout.Column = 1;
 
     ctrl = uigridlayout(leftPanel,[15 2]);
-    ctrl.RowHeight = repmat({24},1,26);
+    ctrl.RowHeight = repmat({24},1,30);
     ctrl.ColumnWidth = {140,'1x'};
 
 
@@ -98,7 +98,7 @@ function ui = buildUI()
 
     %used a ui text area to show a multi-line display box
     statusLabel = uitextarea(ctrl,'Value', {'Status: ready'}, 'Editable', 'off', 'WordWrap', 'on');
-    setPos(statusLabel, [18 26], [1 2]);
+    setPos(statusLabel, [18 25], [1 2]);
 
    
 
