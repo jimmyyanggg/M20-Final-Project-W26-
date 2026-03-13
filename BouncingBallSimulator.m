@@ -16,7 +16,7 @@ end
 
 %main app layout (window, user inputs and buttons, control grid)
 function ui = buildUI()
-    fig = uifigure('Name','Bouncing Ball Physics Simulator', 'Position',[80 80 1100 700]);
+    fig = uifigure('Name','Bouncing Ball Physics Simulator', 'Position',[100 100 1200 900]);
 
     mainGrid = uigridlayout(fig,[1 2]);
     mainGrid.ColumnWidth = {300,'1x'};
