@@ -4,7 +4,7 @@ function BouncingBallSimulator
     setappdata(ui.fig,'lastRun',[]);
     setappdata(ui.fig,'stopSim', false);
 
-    % make sure clicking the X stops animation/loop first
+    % make sure clicking out stops animation/loop first
     ui.fig.CloseRequestFcn = @(src,~) closeApp(src);
 
     %map buttons to coded functions
